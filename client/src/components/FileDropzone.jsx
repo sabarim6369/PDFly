@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Upload, Lock } from 'lucide-react'
 
-export default function FileDropzone({ onDrop, accept = '.pdf', multiple = false }) {
+export default function FileDropzone({ onDrop, accept = 'application/pdf', multiple = false }) {
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleDragOver = (e) => {
@@ -48,7 +48,7 @@ export default function FileDropzone({ onDrop, accept = '.pdf', multiple = false
 
         <div>
           <p className="text-lg font-medium text-gray-900 mb-1">
-            Drop your {accept === '.pdf' ? 'PDF' : 'files'} here
+            Drop your {accept === 'application/pdf' ? 'PDF' : 'files'} here
           </p>
           <p className="text-gray-500 mb-4">or</p>
           <label className="inline-block px-6 py-2 bg-gray-900 text-white rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">

@@ -17,6 +17,17 @@ import ReorderPages from './pages/tools/ReorderPages'
 import WatermarkPDF from './pages/tools/WatermarkPDF'
 import AddTextSignature from './pages/tools/AddTextSignature'
 
+function ToolWrapper({ children }) {
+  return (
+    <div className="flex">
+      <ToolSidebar />
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  )
+}
+
 function App() {
   return (
     <Router>
@@ -45,24 +56,55 @@ function App() {
             </>
           } />
           
-          <Route path="/tools/:slug" element={
-            <div className="flex">
-              <ToolSidebar />
-              <main className="flex-1 lg:ml-64">
-                <Routes>
-                  <Route path="merge-pdf" element={<ToolLayout><MergePDF /></ToolLayout>} />
-                  <Route path="split-pdf" element={<ToolLayout><SplitPDF /></ToolLayout>} />
-                  <Route path="compress-pdf" element={<ToolLayout><CompressPDF /></ToolLayout>} />
-                  <Route path="pdf-to-jpg" element={<ToolLayout><PDFToJPG /></ToolLayout>} />
-                  <Route path="jpg-to-pdf" element={<ToolLayout><JPGToPDF /></ToolLayout>} />
-                  <Route path="rotate-pdf" element={<ToolLayout><RotatePDF /></ToolLayout>} />
-                  <Route path="delete-pages" element={<ToolLayout><DeletePages /></ToolLayout>} />
-                  <Route path="reorder-pages" element={<ToolLayout><ReorderPages /></ToolLayout>} />
-                  <Route path="watermark-pdf" element={<ToolLayout><WatermarkPDF /></ToolLayout>} />
-                  <Route path="add-text-signature" element={<ToolLayout><AddTextSignature /></ToolLayout>} />
-                </Routes>
-              </main>
-            </div>
+          <Route path="/tools/merge-pdf" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="merge-pdf"><MergePDF /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/split-pdf" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="split-pdf"><SplitPDF /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/compress-pdf" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="compress-pdf"><CompressPDF /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/pdf-to-jpg" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="pdf-to-jpg"><PDFToJPG /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/jpg-to-pdf" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="jpg-to-pdf"><JPGToPDF /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/rotate-pdf" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="rotate-pdf"><RotatePDF /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/delete-pages" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="delete-pages"><DeletePages /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/reorder-pages" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="reorder-pages"><ReorderPages /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/watermark-pdf" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="watermark-pdf"><WatermarkPDF /></ToolLayout>
+            </ToolWrapper>
+          } />
+          <Route path="/tools/add-text-signature" element={
+            <ToolWrapper>
+              <ToolLayout toolSlug="add-text-signature"><AddTextSignature /></ToolLayout>
+            </ToolWrapper>
           } />
         </Routes>
       </div>

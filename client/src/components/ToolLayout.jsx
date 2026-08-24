@@ -1,12 +1,13 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { getToolBySlug } from '../data/tools'
 
-export default function ToolLayout({ children }) {
-  const { slug } = useParams()
-  const tool = getToolBySlug(slug)
+export default function ToolLayout({ children, toolSlug }) {
+  console.log('ToolLayout received toolSlug:', toolSlug)
+  const tool = getToolBySlug(toolSlug)
+  console.log('Found tool:', tool)
 
   if (!tool) {
-    return <div>Tool not found</div>
+    return <div>Tool not found: {toolSlug}</div>
   }
 
   return (
