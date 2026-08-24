@@ -3,12 +3,17 @@ import ToolLayout from '../../components/ToolLayout'
 import FileDropzone from '../../components/FileDropzone'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
+import { compressPDF, validatePDFFile, formatFileSize, downloadBlob, calculateCompressionRatio } from '../../lib/pdf/compressPDF'
 
 export default function CompressPDF() {
   const [file, setFile] = useState(null)
   const [compressionLevel, setCompressionLevel] = useState('recommended')
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [compressedBlob, setCompressedBlob] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
 
   const compressionOptions = [
     {
@@ -36,31 +41,67 @@ export default function CompressPDF() {
 
   const handleDrop = (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
       setFile(files[0])
+      setError(null)
     }
   }
 
-  const handleCompress = () => {
+  const handleCompress = async () => {
+    if (!file) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      const blob = await compressPDF(file, compressionLevel, (progress, message) => {
+        setProgress(progress)
+        setProgressMessage(message)
+      })
+      
+      setCompressedBlob(blob)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
     setFile(null)
     setCompressionLevel('recommended')
     setCompleted(false)
+    setCompressedBlob(null)
+    setError(null)
+    setProgress(0)
+  }
+
+  const handleDownload = () => {
+    if (compressedBlob && file) {
+      const originalName = file.name.replace('.pdf', '')
+      downloadBlob(compressedBlob, `${originalName}-compressed.pdf`)
+    }
   }
 
   if (completed) {
-    const option = compressionOptions.find(o => o.id === compressionLevel)
+    const compressedSize = compressedBlob ? compressedBlob.size : 0
+    const originalSize = file ? file.size : 0
+    const reduction = calculateCompressionRatio(originalSize, compressedSize)
+    
     return (
-      <ToolLayout>
+      <ToolLayout toolSlug="compress-pdf">
         <CompletedState
-          fileName="compressed-document.pdf"
-          fileSize={parseFloat(option.outputSize) * 1024 * 1024}
+          fileName={file ? file.name.replace('.pdf', '-compressed.pdf') : 'compressed-document.pdf'}
+          fileSize={compressedSize}
+          originalSize={originalSize}
+          reduction={reduction}
+          onDownload={handleDownload}
           onReset={handleReset}
         />
       </ToolLayout>
@@ -69,15 +110,20 @@ export default function CompressPDF() {
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={80} message="Compressing PDF..." />
+      <ToolLayout toolSlug="compress-pdf">
+        <ProcessingState progress={progress} message={progressMessage || 'Compressing PDF...'} />
       </ToolLayout>
     )
   }
 
   return (
-    <ToolLayout>
+    <ToolLayout toolSlug="compress-pdf">
       <div className="space-y-8">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
         {!file ? (
           <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (

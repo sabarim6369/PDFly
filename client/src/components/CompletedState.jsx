@@ -1,6 +1,6 @@
 import { Download, RefreshCw } from 'lucide-react'
 
-export default function CompletedState({ fileName, fileSize, onReset, onDownload }) {
+export default function CompletedState({ fileName, fileSize, originalSize, reduction, onReset, onDownload }) {
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -24,6 +24,11 @@ export default function CompletedState({ fileName, fileSize, onReset, onDownload
       <div className="text-center mb-6">
         <p className="text-lg font-medium text-gray-900">{fileName}</p>
         <p className="text-sm text-gray-500">{formatFileSize(fileSize)}</p>
+        {originalSize && reduction && (
+          <p className="text-sm text-green-600 mt-1">
+            {formatFileSize(originalSize)} → {formatFileSize(fileSize)} ({reduction}% smaller)
+          </p>
+        )}
       </div>
 
       <div className="flex space-x-4">
@@ -40,7 +45,7 @@ export default function CompletedState({ fileName, fileSize, onReset, onDownload
           className="flex items-center space-x-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
         >
           <RefreshCw size={20} />
-          <span>Merge more PDFs</span>
+          <span>Process another PDF</span>
         </button>
       </div>
     </div>

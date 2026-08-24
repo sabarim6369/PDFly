@@ -1,21 +1,47 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ToolLayout from '../../components/ToolLayout'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
+import { splitPDF, getPDFPageCount, validatePDFFile, formatFileSize, downloadBlob, downloadBlobs } from '../../lib/pdf/splitPDF'
 
 export default function SplitPDF() {
   const [file, setFile] = useState(null)
   const [selectedPages, setSelectedPages] = useState([])
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [pageCount, setPageCount] = useState(0)
+  const [splitMode, setSplitMode] = useState('extract')
+  const [splitResult, setSplitResult] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
 
-  const mockPages = Array.from({ length: 8 }, (_, i) => ({ id: i + 1 }))
+  const pages = pageCount > 0 
+    ? Array.from({ length: pageCount }, (_, i) => ({ id: i + 1 }))
+    : []
 
-  const handleDrop = (files) => {
+  const handleDrop = async (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
+      
       setFile(files[0])
+      setError(null)
+      setSelectedPages([])
+      setCompleted(false)
+      
+      try {
+        const count = await getPDFPageCount(files[0])
+        setPageCount(count)
+      } catch (err) {
+        setError('Failed to read PDF file')
+        setFile(null)
+      }
     }
   }
 
@@ -27,26 +53,63 @@ export default function SplitPDF() {
     )
   }
 
-  const handleSplit = () => {
+  const handleSplit = async () => {
+    if (!file || selectedPages.length === 0) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      const result = await splitPDF(file, selectedPages, splitMode, (progress, message) => {
+        setProgress(progress)
+        setProgressMessage(message)
+      })
+      
+      setSplitResult(result)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
     setFile(null)
     setSelectedPages([])
     setCompleted(false)
+    setPageCount(0)
+    setSplitResult(null)
+    setError(null)
+    setProgress(0)
+  }
+
+  const handleDownload = () => {
+    if (!splitResult || !file) return
+    
+    const baseName = file.name.replace('.pdf', '')
+    
+    if (Array.isArray(splitResult)) {
+      downloadBlobs(splitResult, baseName)
+    } else {
+      downloadBlob(splitResult, `${baseName}-extracted.pdf`)
+    }
   }
 
   if (completed) {
+    const fileSize = Array.isArray(splitResult) 
+      ? splitResult.reduce((acc, blob) => acc + blob.size, 0)
+      : splitResult?.size || 0
+    
     return (
-      <ToolLayout>
+      <ToolLayout toolSlug="split-pdf">
         <CompletedState
-          fileName="split-document.pdf"
-          fileSize={2.1 * 1024 * 1024}
+          fileName={Array.isArray(splitResult) 
+            ? `${file.name.replace('.pdf', '')}-split.zip` 
+            : `${file.name.replace('.pdf', '')}-extracted.pdf`}
+          fileSize={fileSize}
+          onDownload={handleDownload}
           onReset={handleReset}
         />
       </ToolLayout>
@@ -55,15 +118,20 @@ export default function SplitPDF() {
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={60} message="Splitting PDF pages..." />
+      <ToolLayout toolSlug="split-pdf">
+        <ProcessingState progress={progress} message={progressMessage || 'Splitting PDF pages...'} />
       </ToolLayout>
     )
   }
 
   return (
-    <ToolLayout>
+    <ToolLayout toolSlug="split-pdf">
       <div className="space-y-8">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
         {!file ? (
           <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (
@@ -85,10 +153,10 @@ export default function SplitPDF() {
 
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-4">
-                Select pages to extract
+                Select pages to extract ({pageCount} pages total)
               </h3>
               <PDFPreview
-                pages={mockPages}
+                pages={pages}
                 selectedPages={selectedPages}
                 onPageSelect={handlePageSelect}
               />
@@ -101,7 +169,9 @@ export default function SplitPDF() {
                   <input
                     type="radio"
                     name="split-option"
-                    defaultChecked
+                    value="extract"
+                    checked={splitMode === 'extract'}
+                    onChange={(e) => setSplitMode(e.target.value)}
                     className="text-gray-900"
                   />
                   <div>
@@ -110,7 +180,14 @@ export default function SplitPDF() {
                   </div>
                 </label>
                 <label className="flex items-center space-x-3 p-4 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                  <input type="radio" name="split-option" className="text-gray-900" />
+                  <input 
+                    type="radio" 
+                    name="split-option" 
+                    value="range"
+                    checked={splitMode === 'range'}
+                    onChange={(e) => setSplitMode(e.target.value)}
+                    className="text-gray-900" 
+                  />
                   <div>
                     <p className="font-medium text-gray-900">Split by range</p>
                     <p className="text-sm text-gray-500">Divide PDF into page ranges</p>
