@@ -4,6 +4,7 @@ import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
 import { reorderPages, getPDFPageCount, validatePDFFile, downloadBlob } from '../../lib/pdf/reorderPDF'
+import { renderAllPDFPages } from '../../lib/pdf/renderPDF'
 
 export default function ReorderPages() {
   const [file, setFile] = useState(null)
@@ -11,13 +12,19 @@ export default function ReorderPages() {
   const [completed, setCompleted] = useState(false)
   const [pageCount, setPageCount] = useState(0)
   const [pageOrder, setPageOrder] = useState([])
+  const [pageThumbnails, setPageThumbnails] = useState([])
   const [reorderedPdf, setReorderedPdf] = useState(null)
   const [progress, setProgress] = useState(0)
   const [progressMessage, setProgressMessage] = useState('')
   const [error, setError] = useState(null)
+  const [rendering, setRendering] = useState(false)
 
   const pages = pageCount > 0 
-    ? pageOrder.map((originalIndex, newIndex) => ({ id: originalIndex + 1, originalIndex }))
+    ? pageOrder.map((originalIndex, newIndex) => ({ 
+        id: originalIndex + 1, 
+        originalIndex,
+        thumbnail: pageThumbnails[originalIndex]
+      }))
     : []
 
   const handleDrop = async (files) => {
@@ -31,15 +38,22 @@ export default function ReorderPages() {
       setFile(files[0])
       setError(null)
       setCompleted(false)
+      setRendering(true)
       
       try {
         const count = await getPDFPageCount(files[0])
         setPageCount(count)
         // Initialize page order as [0, 1, 2, ...]
         setPageOrder(Array.from({ length: count }, (_, i) => i))
+        
+        // Render all page thumbnails
+        const thumbnails = await renderAllPDFPages(files[0], 1.0)
+        setPageThumbnails(thumbnails)
       } catch (err) {
         setError('Failed to read PDF file')
         setFile(null)
+      } finally {
+        setRendering(false)
       }
     }
   }
@@ -75,9 +89,11 @@ export default function ReorderPages() {
     setCompleted(false)
     setPageCount(0)
     setPageOrder([])
+    setPageThumbnails([])
     setReorderedPdf(null)
     setError(null)
     setProgress(0)
+    setRendering(false)
   }
 
   const handleDownload = () => {
@@ -103,6 +119,12 @@ export default function ReorderPages() {
   if (processing) {
     return (
       <ProcessingState progress={progress} message={progressMessage || 'Reordering pages...'} />
+    )
+  }
+
+  if (rendering) {
+    return (
+      <ProcessingState progress={50} message="Rendering page previews..." />
     )
   }
 

@@ -1,6 +1,6 @@
 import { Trash2, RotateCw, GripVertical } from 'lucide-react'
 
-export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging }) {
+export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, thumbnail }) {
   return (
     <div
       draggable={draggable}
@@ -15,22 +15,34 @@ export default function PDFPageCard({ page, index, selected, onSelect, onDelete,
       `}
     >
       {draggable && (
-        <div className="absolute top-2 left-2 p-1 bg-white/80 rounded cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 left-2 p-1 bg-white/80 rounded cursor-grab opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <GripVertical size={16} className="text-gray-400" />
         </div>
       )}
 
       <div
-        className="aspect-[3/4] bg-gray-100 flex items-center justify-center cursor-pointer"
+        className="aspect-[3/4] bg-gray-100 flex items-center justify-center cursor-pointer overflow-hidden"
         onClick={() => onSelect?.(index)}
       >
-        <div className="text-center">
-          <div className="w-16 h-20 bg-gray-200 rounded mx-auto mb-2" />
-          <p className="text-xs text-gray-500">Page {index + 1}</p>
-        </div>
+        {thumbnail ? (
+          <img 
+            src={thumbnail} 
+            alt={`Page ${index + 1}`}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="text-center">
+            <div className="w-16 h-20 bg-gray-200 rounded mx-auto mb-2" />
+            <p className="text-xs text-gray-500">Page {index + 1}</p>
+          </div>
+        )}
       </div>
 
-      <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+        Page {page.id}
+      </div>
+
+      <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         {onRotate && (
           <button
             onClick={(e) => {

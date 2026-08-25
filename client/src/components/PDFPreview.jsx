@@ -47,6 +47,7 @@ export default function PDFPreview({ pages, onPageSelect, selectedPages, onPageD
           onDrop={draggable ? () => handleDrop(index) : undefined}
           onDragEnd={draggable ? handleDragEnd : undefined}
           isDragging={draggedIndex === index}
+          thumbnail={page.thumbnail}
         />
       ))}
     </div>
