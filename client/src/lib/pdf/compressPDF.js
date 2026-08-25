@@ -9,7 +9,7 @@ export async function compressPDF(file, compressionLevel, onProgress) {
     })
 
     if (onProgress) {
-      onProgress(30, 'Analyzing PDF structure...')
+      onProgress(20, 'Analyzing PDF structure...')
     }
 
     // Get original page count for progress tracking
@@ -17,46 +17,51 @@ export async function compressPDF(file, compressionLevel, onProgress) {
 
     // Compression settings based on level
     const compressionSettings = {
-      recommended: { useObjectStreams: true, compress: true },
-      balanced: { useObjectStreams: true, compress: true, removeUnused: true },
-      maximum: { useObjectStreams: true, compress: true, removeUnused: true, flatten: true }
+      recommended: { quality: 0.8, removeMetadata: true },
+      balanced: { quality: 0.6, removeMetadata: true, removeUnused: true },
+      maximum: { quality: 0.4, removeMetadata: true, removeUnused: true }
     }
 
     const settings = compressionSettings[compressionLevel] || compressionSettings.recommended
 
     if (onProgress) {
-      onProgress(50, 'Optimizing PDF content...')
+      onProgress(40, 'Removing metadata...')
     }
 
-    // Remove unused objects if specified
-    if (settings.removeUnused) {
-      // pdf-lib doesn't have direct removeUnused, but we can optimize by re-saving
-    }
-
-    // Flatten forms if specified (convert form fields to regular content)
-    if (settings.flatten) {
-      try {
-        const form = pdf.getForm()
-        const fields = form.getFields()
-        if (fields.length > 0) {
-          form.flatten()
-        }
-      } catch (error) {
-        // Form flattening might fail if no form exists, that's okay
-      }
+    // Remove metadata
+    if (settings.removeMetadata) {
+      pdf.setTitle('')
+      pdf.setAuthor('')
+      pdf.setSubject('')
+      pdf.setKeywords([])
+      pdf.setProducer('')
+      pdf.setCreator('')
     }
 
     if (onProgress) {
-      onProgress(70, 'Applying compression...')
+      onProgress(60, 'Optimizing PDF structure...')
     }
 
-    // Save with compression settings
+    // For better compression, we need to recreate the PDF
+    // This helps remove unused objects and compress the structure
+    const compressedPdf = await PDFDocument.create()
+    
+    // Copy all pages to the new PDF
+    const copiedPages = await compressedPdf.copyPages(pdf, pdf.getPageIndices())
+    copiedPages.forEach(page => compressedPdf.addPage(page))
+
+    if (onProgress) {
+      onProgress(80, 'Applying compression...')
+    }
+
+    // Save with maximum compression options
     const saveOptions = {
-      useObjectStreams: settings.useObjectStreams,
+      useObjectStreams: true,
       addDefaultPage: false,
+      objectsPerTick: 20,
     }
 
-    const pdfBytes = await pdf.save(saveOptions)
+    const pdfBytes = await compressedPdf.save(saveOptions)
 
     if (onProgress) {
       onProgress(100, 'Compression complete')
@@ -66,6 +71,7 @@ export async function compressPDF(file, compressionLevel, onProgress) {
       type: 'application/pdf'
     })
   } catch (error) {
+    console.error('Compression error:', error)
     throw new Error(`Failed to compress PDF: ${error.message}`)
   }
 }

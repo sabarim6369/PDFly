@@ -112,6 +112,12 @@ export default function SplitPDF() {
     setPageRangesInput(`1-${pageCount}`)
   }
 
+  const splitAllPages = () => {
+    // Create a comma-separated list of all individual pages
+    const allPages = Array.from({ length: pageCount }, (_, i) => i + 1).join(', ')
+    setPageRangesInput(allPages)
+  }
+
   const handleSplit = async () => {
     if (!file) return
     
@@ -337,6 +343,12 @@ export default function SplitPDF() {
                     className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
                   >
                     + All pages
+                  </button>
+                  <button
+                    onClick={splitAllPages}
+                    className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition-colors"
+                  >
+                    Split All Pages
                   </button>
                 </div>
               </div>
