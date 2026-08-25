@@ -1,61 +1,120 @@
 import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
+import { reorderPages, getPDFPageCount, validatePDFFile, downloadBlob } from '../../lib/pdf/reorderPDF'
 
 export default function ReorderPages() {
   const [file, setFile] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [pageCount, setPageCount] = useState(0)
+  const [pageOrder, setPageOrder] = useState([])
+  const [reorderedPdf, setReorderedPdf] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
 
-  const mockPages = Array.from({ length: 8 }, (_, i) => ({ id: i + 1 }))
+  const pages = pageCount > 0 
+    ? pageOrder.map((originalIndex, newIndex) => ({ id: originalIndex + 1, originalIndex }))
+    : []
 
-  const handleDrop = (files) => {
+  const handleDrop = async (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
+      
       setFile(files[0])
+      setError(null)
+      setCompleted(false)
+      
+      try {
+        const count = await getPDFPageCount(files[0])
+        setPageCount(count)
+        // Initialize page order as [0, 1, 2, ...]
+        setPageOrder(Array.from({ length: count }, (_, i) => i))
+      } catch (err) {
+        setError('Failed to read PDF file')
+        setFile(null)
+      }
     }
   }
 
-  const handleApply = () => {
+  const handlePageReorder = (newOrder) => {
+    setPageOrder(newOrder)
+  }
+
+  const handleApply = async () => {
+    if (!file || pageOrder.length === 0) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      const result = await reorderPages(file, pageOrder, (progress, message) => {
+        setProgress(progress)
+        setProgressMessage(message)
+      })
+      
+      setReorderedPdf(result)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
     setFile(null)
     setCompleted(false)
+    setPageCount(0)
+    setPageOrder([])
+    setReorderedPdf(null)
+    setError(null)
+    setProgress(0)
+  }
+
+  const handleDownload = () => {
+    if (!reorderedPdf || !file) return
+    
+    const filename = file.name.replace('.pdf', '-reordered.pdf')
+    downloadBlob(reorderedPdf, filename)
   }
 
   if (completed) {
+    const fileSize = reorderedPdf ? reorderedPdf.size : 0
+    
     return (
-      <ToolLayout>
-        <CompletedState
-          fileName="reordered-document.pdf"
-          fileSize={2.6 * 1024 * 1024}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName={file ? file.name.replace('.pdf', '-reordered.pdf') : 'reordered-document.pdf'}
+        fileSize={fileSize}
+        onDownload={handleDownload}
+        onReset={handleReset}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={45} message="Reordering pages..." />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || 'Reordering pages...'} />
     )
   }
 
   return (
-    <ToolLayout>
-      <div className="space-y-8">
-        {!file ? (
-          <FileDropzone onDrop={handleDrop} accept=".pdf" />
+    <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+      {!file ? (
+        <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (
           <>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -75,11 +134,12 @@ export default function ReorderPages() {
 
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-4">
-                Drag and drop to reorder pages
+                Drag and drop to reorder pages ({pageCount} pages total)
               </h3>
               <PDFPreview
-                pages={mockPages}
+                pages={pages}
                 draggable={true}
+                onPageReorder={handlePageReorder}
               />
             </div>
 
@@ -91,13 +151,13 @@ export default function ReorderPages() {
 
             <button
               onClick={handleApply}
-              className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={pageOrder.length === 0}
+              className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               Apply new order
             </button>
           </>
         )}
       </div>
-    </ToolLayout>
   )
 }

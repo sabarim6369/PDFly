@@ -1,11 +1,17 @@
 import { Trash2, RotateCw, GripVertical } from 'lucide-react'
 
-export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false }) {
+export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging }) {
   return (
     <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       className={`
         relative group bg-white border rounded-lg overflow-hidden transition-all
         ${selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'}
+        ${isDragging ? 'opacity-50' : ''}
       `}
     >
       {draggable && (
