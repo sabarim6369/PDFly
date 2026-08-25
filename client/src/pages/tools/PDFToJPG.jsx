@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
+import { convertPDFToJPG, getPDFPageCount, validatePDFFile, downloadImages } from '../../lib/pdf/pdfToJPG'
 
 export default function PDFToJPG() {
   const [file, setFile] = useState(null)
@@ -11,8 +11,15 @@ export default function PDFToJPG() {
   const [quality, setQuality] = useState('high')
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [pageCount, setPageCount] = useState(0)
+  const [convertedImages, setConvertedImages] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
 
-  const mockPages = Array.from({ length: 6 }, (_, i) => ({ id: i + 1 }))
+  const pages = pageCount > 0 
+    ? Array.from({ length: pageCount }, (_, i) => ({ id: i + 1 }))
+    : []
 
   const qualityOptions = [
     { id: 'low', name: 'Low', description: 'Smaller file size' },
@@ -20,9 +27,26 @@ export default function PDFToJPG() {
     { id: 'high', name: 'High', description: 'Best quality' }
   ]
 
-  const handleDrop = (files) => {
+  const handleDrop = async (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
+      
       setFile(files[0])
+      setError(null)
+      setSelectedPages([])
+      setCompleted(false)
+      
+      try {
+        const count = await getPDFPageCount(files[0])
+        setPageCount(count)
+      } catch (err) {
+        setError('Failed to read PDF file')
+        setFile(null)
+      }
     }
   }
 
@@ -34,12 +58,26 @@ export default function PDFToJPG() {
     )
   }
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
+    if (!file) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      const images = await convertPDFToJPG(file, selectedPages, quality, (progress, message) => {
+        setProgress(progress)
+        setProgressMessage(message)
+      })
+      
+      setConvertedImages(images)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
@@ -47,33 +85,47 @@ export default function PDFToJPG() {
     setSelectedPages([])
     setQuality('high')
     setCompleted(false)
+    setPageCount(0)
+    setConvertedImages(null)
+    setError(null)
+    setProgress(0)
+  }
+
+  const handleDownload = () => {
+    if (!convertedImages || !file) return
+    
+    const baseName = file.name.replace('.pdf', '')
+    downloadImages(convertedImages, baseName)
   }
 
   if (completed) {
+    const totalSize = convertedImages ? convertedImages.reduce((acc, img) => acc + img.blob.size, 0) : 0
+    
     return (
-      <ToolLayout>
-        <CompletedState
-          fileName="converted-images.zip"
-          fileSize={4.2 * 1024 * 1024}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName={`${file.name.replace('.pdf', '')}-images.zip`}
+        fileSize={totalSize}
+        onDownload={handleDownload}
+        onReset={handleReset}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={70} message="Converting to JPG..." />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || 'Converting to JPG...'} />
     )
   }
 
   return (
-    <ToolLayout>
-      <div className="space-y-8">
-        {!file ? (
-          <FileDropzone onDrop={handleDrop} accept=".pdf" />
+    <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+      {!file ? (
+        <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (
           <>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -93,10 +145,10 @@ export default function PDFToJPG() {
 
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-4">
-                Select pages to convert
+                Select pages to convert ({pageCount} pages total)
               </h3>
               <PDFPreview
-                pages={mockPages}
+                pages={pages}
                 selectedPages={selectedPages}
                 onPageSelect={handlePageSelect}
               />
@@ -141,6 +193,5 @@ export default function PDFToJPG() {
           </>
         )}
       </div>
-    </ToolLayout>
   )
 }
