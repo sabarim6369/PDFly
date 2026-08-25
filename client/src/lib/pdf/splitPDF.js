@@ -18,7 +18,13 @@ export async function splitPDF(file, selectedPages, splitMode, onProgress) {
         onProgress(40, 'Extracting pages...')
       }
 
-      const pageIndices = selectedPages.map(page => page - 1) // Convert to 0-based index
+      // Validate and filter page indices (already 0-based from UI)
+      const pageIndices = selectedPages.filter(index => index >= 0 && index < totalPages)
+      
+      if (pageIndices.length === 0) {
+        throw new Error('No valid pages selected')
+      }
+
       const copiedPages = await newPdf.copyPages(pdf, pageIndices)
       copiedPages.forEach(page => newPdf.addPage(page))
 
@@ -35,7 +41,8 @@ export async function splitPDF(file, selectedPages, splitMode, onProgress) {
       return new Blob([pdfBytes], { type: 'application/pdf' })
     } else if (splitMode === 'range') {
       // Split by ranges - return array of blobs
-      const ranges = parsePageRanges(selectedPages, totalPages)
+      // selectedPages should already be an array of {start, end} objects
+      const ranges = selectedPages
       const blobs = []
 
       for (let i = 0; i < ranges.length; i++) {
@@ -44,7 +51,14 @@ export async function splitPDF(file, selectedPages, splitMode, onProgress) {
         
         const pageIndices = []
         for (let j = range.start; j <= range.end; j++) {
-          pageIndices.push(j - 1) // Convert to 0-based index
+          const index = j - 1 // Convert to 0-based index
+          if (index >= 0 && index < totalPages) {
+            pageIndices.push(index)
+          }
+        }
+        
+        if (pageIndices.length === 0) {
+          throw new Error(`Invalid range: ${range.start}-${range.end}`)
         }
         
         const copiedPages = await newPdf.copyPages(pdf, pageIndices)
@@ -62,6 +76,7 @@ export async function splitPDF(file, selectedPages, splitMode, onProgress) {
       return blobs
     }
   } catch (error) {
+    console.error('Split PDF error:', error)
     throw new Error(`Failed to split PDF: ${error.message}`)
   }
 }

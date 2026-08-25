@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
 import FileDropzone from '../../components/FileDropzone'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
@@ -95,102 +94,96 @@ export default function CompressPDF() {
     const reduction = calculateCompressionRatio(originalSize, compressedSize)
     
     return (
-      <ToolLayout toolSlug="compress-pdf">
-        <CompletedState
-          fileName={file ? file.name.replace('.pdf', '-compressed.pdf') : 'compressed-document.pdf'}
-          fileSize={compressedSize}
-          originalSize={originalSize}
-          reduction={reduction}
-          onDownload={handleDownload}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName={file ? file.name.replace('.pdf', '-compressed.pdf') : 'compressed-document.pdf'}
+        fileSize={compressedSize}
+        originalSize={originalSize}
+        reduction={reduction}
+        onDownload={handleDownload}
+        onReset={handleReset}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout toolSlug="compress-pdf">
-        <ProcessingState progress={progress} message={progressMessage || 'Compressing PDF...'} />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || 'Compressing PDF...'} />
     )
   }
 
   return (
-    <ToolLayout toolSlug="compress-pdf">
-      <div className="space-y-8">
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-        {!file ? (
-          <FileDropzone onDrop={handleDrop} accept=".pdf" />
-        ) : (
-          <>
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                </div>
-                <button
-                  onClick={() => setFile(null)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Change file
-                </button>
+    <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+      {!file ? (
+        <FileDropzone onDrop={handleDrop} accept=".pdf" />
+      ) : (
+        <>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-900">{file.name}</p>
+                <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
+              <button
+                onClick={() => setFile(null)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Change file
+              </button>
             </div>
+          </div>
 
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-4">Compression level</h3>
-              <div className="space-y-3">
-                {compressionOptions.map((option) => (
-                  <label
-                    key={option.id}
-                    className={`
-                      block p-4 border rounded-lg cursor-pointer transition-all
-                      ${compressionLevel === option.id
-                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
-                      }
-                    `}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
-                        <input
-                          type="radio"
-                          name="compression"
-                          value={option.id}
-                          checked={compressionLevel === option.id}
-                          onChange={(e) => setCompressionLevel(e.target.value)}
-                          className="mt-1 text-gray-900"
-                        />
-                        <div>
-                          <p className="font-medium text-gray-900">{option.name}</p>
-                          <p className="text-sm text-gray-500">{option.description}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-green-600">{option.reduction} smaller</p>
-                        <p className="text-xs text-gray-500">Est. {option.outputSize}</p>
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-4">Compression level</h3>
+            <div className="space-y-3">
+              {compressionOptions.map((option) => (
+                <label
+                  key={option.id}
+                  className={`
+                    block p-4 border rounded-lg cursor-pointer transition-all
+                    ${compressionLevel === option.id
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-gray-300'
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="radio"
+                        name="compression"
+                        value={option.id}
+                        checked={compressionLevel === option.id}
+                        onChange={(e) => setCompressionLevel(e.target.value)}
+                        className="mt-1 text-gray-900"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">{option.name}</p>
+                        <p className="text-sm text-gray-500">{option.description}</p>
                       </div>
                     </div>
-                  </label>
-                ))}
-              </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-green-600">{option.reduction} smaller</p>
+                      <p className="text-xs text-gray-500">Est. {option.outputSize}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
             </div>
+          </div>
 
-            <button
-              onClick={handleCompress}
-              className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Compress PDF
-            </button>
-          </>
-        )}
-      </div>
-    </ToolLayout>
+          <button
+            onClick={handleCompress}
+            className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Compress PDF
+          </button>
+        </>
+      )}
+    </div>
   )
 }
