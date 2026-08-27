@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
@@ -19,13 +19,16 @@ export default function ReorderPages() {
   const [error, setError] = useState(null)
   const [rendering, setRendering] = useState(false)
 
-  const pages = pageCount > 0 
-    ? pageOrder.map((originalIndex, newIndex) => ({ 
+  const pages = useMemo(() => {
+    if (pageCount > 0) {
+      return pageOrder.map((originalIndex, newIndex) => ({ 
         id: originalIndex + 1, 
         originalIndex,
         thumbnail: pageThumbnails[originalIndex]
       }))
-    : []
+    }
+    return []
+  }, [pageCount, pageOrder, pageThumbnails])
 
   const handleDrop = async (files) => {
     if (files.length > 0) {

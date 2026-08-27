@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
+import { useState, useMemo } from 'react'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
 import { RotateCw, RotateCcw } from 'lucide-react'
+import { rotatePDF, getPDFPageCount, validatePDFFile, downloadBlob } from '../../lib/pdf/rotatePDF'
+import { renderAllPDFPages } from '../../lib/pdf/renderPDF'
 
 export default function RotatePDF() {
   const [file, setFile] = useState(null)
@@ -12,12 +13,52 @@ export default function RotatePDF() {
   const [rotations, setRotations] = useState({})
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [pageCount, setPageCount] = useState(0)
+  const [pageThumbnails, setPageThumbnails] = useState([])
+  const [rotatedPdf, setRotatedPdf] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
+  const [rendering, setRendering] = useState(false)
 
-  const mockPages = Array.from({ length: 6 }, (_, i) => ({ id: i + 1 }))
+  const pages = useMemo(() => {
+    if (pageCount > 0) {
+      return Array.from({ length: pageCount }, (_, i) => ({ 
+        id: i + 1, 
+        thumbnail: pageThumbnails[i]
+      }))
+    }
+    return []
+  }, [pageCount, pageThumbnails])
 
-  const handleDrop = (files) => {
+  const handleDrop = async (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
+      
       setFile(files[0])
+      setError(null)
+      setSelectedPages([])
+      setRotations({})
+      setCompleted(false)
+      setRendering(true)
+      
+      try {
+        const count = await getPDFPageCount(files[0])
+        setPageCount(count)
+        
+        // Render all page thumbnails
+        const thumbnails = await renderAllPDFPages(files[0], 1.0)
+        setPageThumbnails(thumbnails)
+      } catch (err) {
+        setError('Failed to read PDF file')
+        setFile(null)
+      } finally {
+        setRendering(false)
+      }
     }
   }
 
@@ -40,19 +81,33 @@ export default function RotatePDF() {
     const adjustment = direction === 'right' ? 90 : -90
     setRotations(prev => {
       const newRotations = { ...prev }
-      mockPages.forEach((_, i) => {
+      for (let i = 0; i < pageCount; i++) {
         newRotations[i] = (newRotations[i] || 0) + adjustment
-      })
+      }
       return newRotations
     })
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    if (!file) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      const result = await rotatePDF(file, rotations, (progress, message) => {
+        setProgress(progress)
+        setProgressMessage(message)
+      })
+      
+      setRotatedPdf(result)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
@@ -60,33 +115,55 @@ export default function RotatePDF() {
     setSelectedPages([])
     setRotations({})
     setCompleted(false)
+    setPageCount(0)
+    setPageThumbnails([])
+    setRotatedPdf(null)
+    setError(null)
+    setProgress(0)
+    setRendering(false)
+  }
+
+  const handleDownload = () => {
+    if (!rotatedPdf || !file) return
+    
+    const filename = file.name.replace('.pdf', '-rotated.pdf')
+    downloadBlob(rotatedPdf, filename)
   }
 
   if (completed) {
+    const fileSize = rotatedPdf ? rotatedPdf.size : 0
+    
     return (
-      <ToolLayout>
-        <CompletedState
-          fileName="rotated-document.pdf"
-          fileSize={2.4 * 1024 * 1024}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName={file ? file.name.replace('.pdf', '-rotated.pdf') : 'rotated-document.pdf'}
+        fileSize={fileSize}
+        onDownload={handleDownload}
+        onReset={handleReset}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={55} message="Rotating pages..." />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || 'Rotating pages...'} />
+    )
+  }
+
+  if (rendering) {
+    return (
+      <ProcessingState progress={50} message="Rendering page previews..." />
     )
   }
 
   return (
-    <ToolLayout>
-      <div className="space-y-8">
-        {!file ? (
-          <FileDropzone onDrop={handleDrop} accept=".pdf" />
+    <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+      {!file ? (
+        <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (
           <>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -123,10 +200,10 @@ export default function RotatePDF() {
 
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-4">
-                Select pages to rotate
+                Select pages to rotate ({pageCount} pages total)
               </h3>
               <PDFPreview
-                pages={mockPages}
+                pages={pages}
                 selectedPages={selectedPages}
                 onPageSelect={handlePageSelect}
                 onPageRotate={handleRotate}
@@ -135,7 +212,7 @@ export default function RotatePDF() {
 
             <button
               onClick={handleApply}
-              disabled={selectedPages.length === 0}
+              disabled={Object.keys(rotations).length === 0}
               className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               Apply rotation
@@ -143,6 +220,5 @@ export default function RotatePDF() {
           </>
         )}
       </div>
-    </ToolLayout>
   )
 }

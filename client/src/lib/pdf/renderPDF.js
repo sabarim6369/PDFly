@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Set up worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Set up worker with CDN URL matching installed version
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export async function renderAllPDFPages(file, scale = 1.0) {
   try {
