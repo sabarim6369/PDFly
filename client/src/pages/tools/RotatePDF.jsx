@@ -5,7 +5,10 @@ import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
 import { RotateCw, RotateCcw } from 'lucide-react'
 import { rotatePDF, getPDFPageCount, validatePDFFile, downloadBlob } from '../../lib/pdf/rotatePDF'
-import { renderAllPDFPages } from '../../lib/pdf/renderPDF'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set up worker with CDN URL matching installed version
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function RotatePDF() {
   const [file, setFile] = useState(null)
@@ -14,22 +17,22 @@ export default function RotatePDF() {
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
   const [pageCount, setPageCount] = useState(0)
-  const [pageThumbnails, setPageThumbnails] = useState([])
+  const [pdf, setPdf] = useState(null)
   const [rotatedPdf, setRotatedPdf] = useState(null)
   const [progress, setProgress] = useState(0)
   const [progressMessage, setProgressMessage] = useState('')
   const [error, setError] = useState(null)
-  const [rendering, setRendering] = useState(false)
+  const [loadingPdf, setLoadingPdf] = useState(false)
 
   const pages = useMemo(() => {
     if (pageCount > 0) {
       return Array.from({ length: pageCount }, (_, i) => ({ 
-        id: i + 1, 
-        thumbnail: pageThumbnails[i]
+        id: i + 1,
+        pageNumber: i + 1
       }))
     }
     return []
-  }, [pageCount, pageThumbnails])
+  }, [pageCount])
 
   const handleDrop = async (files) => {
     if (files.length > 0) {
@@ -44,20 +47,23 @@ export default function RotatePDF() {
       setSelectedPages([])
       setRotations({})
       setCompleted(false)
-      setRendering(true)
+      setLoadingPdf(true)
       
       try {
         const count = await getPDFPageCount(files[0])
         setPageCount(count)
         
-        // Render all page thumbnails
-        const thumbnails = await renderAllPDFPages(files[0], 1.0)
-        setPageThumbnails(thumbnails)
+        // Load PDF with pdf.js for rendering
+        const arrayBuffer = await files[0].arrayBuffer()
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+        const pdfDocument = await loadingTask.promise
+        setPdf(pdfDocument)
       } catch (err) {
-        setError('Failed to read PDF file')
+        console.error('PDF loading error:', err)
+        setError(`Failed to read PDF file: ${err.message || err}`)
         setFile(null)
       } finally {
-        setRendering(false)
+        setLoadingPdf(false)
       }
     }
   }
@@ -116,11 +122,11 @@ export default function RotatePDF() {
     setRotations({})
     setCompleted(false)
     setPageCount(0)
-    setPageThumbnails([])
+    setPdf(null)
     setRotatedPdf(null)
     setError(null)
     setProgress(0)
-    setRendering(false)
+    setLoadingPdf(false)
   }
 
   const handleDownload = () => {
@@ -149,9 +155,9 @@ export default function RotatePDF() {
     )
   }
 
-  if (rendering) {
+  if (loadingPdf) {
     return (
-      <ProcessingState progress={50} message="Rendering page previews..." />
+      <ProcessingState progress={50} message="Loading PDF..." />
     )
   }
 
@@ -207,6 +213,8 @@ export default function RotatePDF() {
                 selectedPages={selectedPages}
                 onPageSelect={handlePageSelect}
                 onPageRotate={handleRotate}
+                pdf={pdf}
+                scale={0.4}
               />
             </div>
 

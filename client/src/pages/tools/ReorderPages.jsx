@@ -4,7 +4,10 @@ import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
 import { reorderPages, getPDFPageCount, validatePDFFile, downloadBlob } from '../../lib/pdf/reorderPDF'
-import { renderAllPDFPages } from '../../lib/pdf/renderPDF'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set up worker with CDN URL matching installed version
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function ReorderPages() {
   const [file, setFile] = useState(null)
@@ -12,23 +15,23 @@ export default function ReorderPages() {
   const [completed, setCompleted] = useState(false)
   const [pageCount, setPageCount] = useState(0)
   const [pageOrder, setPageOrder] = useState([])
-  const [pageThumbnails, setPageThumbnails] = useState([])
+  const [pdf, setPdf] = useState(null)
   const [reorderedPdf, setReorderedPdf] = useState(null)
   const [progress, setProgress] = useState(0)
   const [progressMessage, setProgressMessage] = useState('')
   const [error, setError] = useState(null)
-  const [rendering, setRendering] = useState(false)
+  const [loadingPdf, setLoadingPdf] = useState(false)
 
   const pages = useMemo(() => {
     if (pageCount > 0) {
       return pageOrder.map((originalIndex, newIndex) => ({ 
         id: originalIndex + 1, 
         originalIndex,
-        thumbnail: pageThumbnails[originalIndex]
+        pageNumber: originalIndex + 1
       }))
     }
     return []
-  }, [pageCount, pageOrder, pageThumbnails])
+  }, [pageCount, pageOrder])
 
   const handleDrop = async (files) => {
     if (files.length > 0) {
@@ -41,7 +44,7 @@ export default function ReorderPages() {
       setFile(files[0])
       setError(null)
       setCompleted(false)
-      setRendering(true)
+      setLoadingPdf(true)
       
       try {
         const count = await getPDFPageCount(files[0])
@@ -49,14 +52,16 @@ export default function ReorderPages() {
         // Initialize page order as [0, 1, 2, ...]
         setPageOrder(Array.from({ length: count }, (_, i) => i))
         
-        // Render all page thumbnails
-        const thumbnails = await renderAllPDFPages(files[0], 1.0)
-        setPageThumbnails(thumbnails)
+        // Load PDF with pdf.js for rendering
+        const arrayBuffer = await files[0].arrayBuffer()
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+        const pdfDocument = await loadingTask.promise
+        setPdf(pdfDocument)
       } catch (err) {
         setError('Failed to read PDF file')
         setFile(null)
       } finally {
-        setRendering(false)
+        setLoadingPdf(false)
       }
     }
   }
@@ -92,11 +97,11 @@ export default function ReorderPages() {
     setCompleted(false)
     setPageCount(0)
     setPageOrder([])
-    setPageThumbnails([])
+    setPdf(null)
     setReorderedPdf(null)
     setError(null)
     setProgress(0)
-    setRendering(false)
+    setLoadingPdf(false)
   }
 
   const handleDownload = () => {
@@ -125,9 +130,9 @@ export default function ReorderPages() {
     )
   }
 
-  if (rendering) {
+  if (loadingPdf) {
     return (
-      <ProcessingState progress={50} message="Rendering page previews..." />
+      <ProcessingState progress={50} message="Loading PDF..." />
     )
   }
 
@@ -165,6 +170,8 @@ export default function ReorderPages() {
                 pages={pages}
                 draggable={true}
                 onPageReorder={handlePageReorder}
+                pdf={pdf}
+                scale={0.4}
               />
             </div>
 

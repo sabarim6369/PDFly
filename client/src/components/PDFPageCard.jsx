@@ -1,6 +1,7 @@
 import { Trash2, RotateCw, GripVertical } from 'lucide-react'
+import PDFPagePreview from './PDFPagePreview'
 
-export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, thumbnail }) {
+export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, pdf, scale }) {
   return (
     <div
       draggable={draggable}
@@ -24,11 +25,11 @@ export default function PDFPageCard({ page, index, selected, onSelect, onDelete,
         className="aspect-[3/4] bg-gray-100 flex items-center justify-center cursor-pointer overflow-hidden"
         onClick={() => onSelect?.(index)}
       >
-        {thumbnail ? (
-          <img 
-            src={thumbnail} 
-            alt={`Page ${index + 1}`}
-            className="w-full h-full object-cover"
+        {pdf ? (
+          <PDFPagePreview
+            pdf={pdf}
+            pageNumber={page.pageNumber}
+            scale={scale}
           />
         ) : (
           <div className="text-center">
@@ -38,7 +39,7 @@ export default function PDFPageCard({ page, index, selected, onSelect, onDelete,
         )}
       </div>
 
-      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
         Page {page.id}
       </div>
 
