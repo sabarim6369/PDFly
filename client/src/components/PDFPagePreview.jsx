@@ -5,6 +5,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function PDFPagePreview({ pdf, pageNumber, scale = 0.4 }) {
+  console.log(`PDFPagePreview mounted: pageNumber=${pageNumber}, pdf=${!!pdf}, scale=${scale}`)
   const canvasRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -19,11 +20,14 @@ export default function PDFPagePreview({ pdf, pageNumber, scale = 0.4 }) {
       setError(false)
 
       try {
+        console.log(`Starting render for page ${pageNumber}`)
         const page = await pdf.getPage(pageNumber)
+        console.log(`Page ${pageNumber} fetched`)
         
         if (!isMounted) return
 
         const viewport = page.getViewport({ scale })
+        console.log(`Viewport for page ${pageNumber}:`, viewport.width, 'x', viewport.height)
         
         const canvas = canvasRef.current
         const context = canvas.getContext('2d')
@@ -40,7 +44,9 @@ export default function PDFPagePreview({ pdf, pageNumber, scale = 0.4 }) {
           viewport: viewport
         }
         
+        console.log(`Starting render for page ${pageNumber}`)
         await page.render(renderContext).promise
+        console.log(`Page ${pageNumber} rendered successfully`)
         
         if (isMounted) {
           setLoading(false)

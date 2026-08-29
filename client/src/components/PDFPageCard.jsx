@@ -26,11 +26,14 @@ export default function PDFPageCard({ page, index, selected, onSelect, onDelete,
         onClick={() => onSelect?.(index)}
       >
         {pdf ? (
-          <PDFPagePreview
-            pdf={pdf}
-            pageNumber={page.pageNumber}
-            scale={scale}
-          />
+          <>
+            {console.log(`PDFPageCard rendering page ${index} with pdf:`, !!pdf, 'pageNumber:', page.pageNumber)}
+            <PDFPagePreview
+              pdf={pdf}
+              pageNumber={page.pageNumber}
+              scale={scale}
+            />
+          </>
         ) : (
           <div className="text-center">
             <div className="w-16 h-20 bg-gray-200 rounded mx-auto mb-2" />

@@ -55,9 +55,16 @@ export default function RotatePDF() {
         
         // Load PDF with pdf.js for rendering
         const arrayBuffer = await files[0].arrayBuffer()
+        console.log('ArrayBuffer size:', arrayBuffer.byteLength)
+        
         const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+        console.log('Loading task created')
+        
         const pdfDocument = await loadingTask.promise
+        console.log('PDF loaded successfully, pages:', pdfDocument.numPages)
+        
         setPdf(pdfDocument)
+        console.log('PDF state set')
       } catch (err) {
         console.error('PDF loading error:', err)
         setError(`Failed to read PDF file: ${err.message || err}`)
