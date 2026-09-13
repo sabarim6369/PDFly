@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
-import { deletePages, getPDFPageCount, validatePDFFile, downloadBlob } from '../../lib/pdf/deletePDF'
+import { deletePages, validatePDFFile, downloadBlob } from '../../lib/pdf/deletePDF'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function DeletePages() {
   const [file, setFile] = useState(null)
@@ -16,9 +19,17 @@ export default function DeletePages() {
   const [progressMessage, setProgressMessage] = useState('')
   const [error, setError] = useState(null)
 
-  const pages = pageCount > 0 
-    ? Array.from({ length: pageCount }, (_, i) => ({ id: i + 1 }))
-    : []
+  const [pdfDoc, setPdfDoc] = useState(null)
+  
+  const pages = useMemo(() => {
+    if (pageCount > 0) {
+      return Array.from({ length: pageCount }, (_, i) => ({ 
+        id: i + 1,
+        pageNumber: i + 1
+      }))
+    }
+    return []
+  }, [pageCount])
 
   const handleDrop = async (files) => {
     if (files.length > 0) {
@@ -34,8 +45,11 @@ export default function DeletePages() {
       setCompleted(false)
       
       try {
-        const count = await getPDFPageCount(files[0])
-        setPageCount(count)
+        const arrayBuffer = await files[0].arrayBuffer()
+        const loadedPdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        
+        setPdfDoc(loadedPdf)
+        setPageCount(loadedPdf.numPages)
       } catch (err) {
         setError('Failed to read PDF file')
         setFile(null)
@@ -90,6 +104,13 @@ export default function DeletePages() {
     downloadBlob(deletedPdf, filename)
   }
 
+  const handlePreview = () => {
+    if (deletedPdf) {
+      const url = URL.createObjectURL(deletedPdf)
+      window.open(url, '_blank')
+    }
+  }
+
   if (completed) {
     const fileSize = deletedPdf ? deletedPdf.size : 0
     
@@ -99,6 +120,7 @@ export default function DeletePages() {
         fileSize={fileSize}
         onDownload={handleDownload}
         onReset={handleReset}
+        onPreview={handlePreview}
       />
     )
   }
@@ -144,6 +166,8 @@ export default function DeletePages() {
                 selectedPages={selectedPages}
                 onPageSelect={handlePageSelect}
                 onPageDelete={(index) => handlePageSelect(index)}
+                pdf={pdfDoc}
+                scale={0.4}
               />
             </div>
 

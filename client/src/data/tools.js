@@ -35,13 +35,6 @@ export const tools = [
     category: 'compress'
   },
   {
-    name: 'PDF → JPG',
-    slug: 'pdf-to-jpg',
-    description: 'Convert PDF pages into JPG images.',
-    icon: FileImage,
-    category: 'convert'
-  },
-  {
     name: 'JPG → PDF',
     slug: 'jpg-to-pdf',
     description: 'Create a PDF from JPG images.',

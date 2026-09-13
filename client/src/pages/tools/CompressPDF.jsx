@@ -88,6 +88,13 @@ export default function CompressPDF() {
     }
   }
 
+  const handlePreview = () => {
+    if (compressedBlob) {
+      const url = URL.createObjectURL(compressedBlob)
+      window.open(url, '_blank')
+    }
+  }
+
   if (completed) {
     const compressedSize = compressedBlob ? compressedBlob.size : 0
     const originalSize = file ? file.size : 0
@@ -101,6 +108,7 @@ export default function CompressPDF() {
         reduction={reduction}
         onDownload={handleDownload}
         onReset={handleReset}
+        onPreview={handlePreview}
       />
     )
   }

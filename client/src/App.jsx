@@ -9,7 +9,6 @@ import ToolLayout from './components/ToolLayout'
 import MergePDF from './pages/tools/MergePDF'
 import SplitPDF from './pages/tools/SplitPDF'
 import CompressPDF from './pages/tools/CompressPDF'
-import PDFToJPG from './pages/tools/PDFToJPG'
 import JPGToPDF from './pages/tools/JPGToPDF'
 import RotatePDF from './pages/tools/RotatePDF'
 import DeletePages from './pages/tools/DeletePages'
@@ -69,11 +68,6 @@ function App() {
           <Route path="/tools/compress-pdf" element={
             <ToolWrapper>
               <ToolLayout toolSlug="compress-pdf"><CompressPDF /></ToolLayout>
-            </ToolWrapper>
-          } />
-          <Route path="/tools/pdf-to-jpg" element={
-            <ToolWrapper>
-              <ToolLayout toolSlug="pdf-to-jpg"><PDFToJPG /></ToolLayout>
             </ToolWrapper>
           } />
           <Route path="/tools/jpg-to-pdf" element={

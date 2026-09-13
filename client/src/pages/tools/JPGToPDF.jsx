@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
 import FileDropzone from '../../components/FileDropzone'
 import FileList from '../../components/FileList'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
-import { GripVertical, Plus } from 'lucide-react'
+import { GripVertical, Plus, AlertCircle } from 'lucide-react'
+import { jpgToPdf, validateImageFiles, downloadBlob } from '../../lib/pdf/jpgToPdf'
 
 export default function JPGToPDF() {
   const [files, setFiles] = useState([])
@@ -12,6 +12,11 @@ export default function JPGToPDF() {
   const [orientation, setOrientation] = useState('portrait')
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [resultBlob, setResultBlob] = useState(null)
+  const [error, setError] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [draggedIndex, setDraggedIndex] = useState(null)
 
   const pageSizeOptions = [
     { id: 'a4', name: 'A4' },
@@ -20,49 +25,113 @@ export default function JPGToPDF() {
   ]
 
   const handleDrop = (newFiles) => {
-    setFiles([...files, ...newFiles])
+    setError(null)
+    const validation = validateImageFiles(newFiles)
+    if (!validation.valid) {
+      setError(validation.error)
+    }
+    
+    const validFiles = newFiles.filter(f => f.type.startsWith('image/'))
+    if (validFiles.length > 0) {
+      setFiles([...files, ...validFiles])
+    }
   }
 
   const handleRemove = (index) => {
     setFiles(files.filter((_, i) => i !== index))
   }
 
-  const handleConvert = () => {
+  const handleDragStart = (index) => {
+    setDraggedIndex(index)
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+  }
+
+  const handleDropOnItem = (e, targetIndex) => {
+    e.preventDefault()
+    if (draggedIndex === null || draggedIndex === targetIndex) return
+
+    const newFiles = [...files]
+    const [draggedFile] = newFiles.splice(draggedIndex, 1)
+    newFiles.splice(targetIndex, 0, draggedFile)
+
+    setFiles(newFiles)
+    setDraggedIndex(null)
+  }
+
+  const handleConvert = async () => {
+    if (files.length === 0) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+
+    try {
+      const blob = await jpgToPdf(files, pageSize, orientation, (progress, message) => {
+        setProgress(progress)
+        setProgressMessage(message)
+      })
+      
+      setResultBlob(blob)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      console.error('Conversion error:', err)
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
     setFiles([])
     setCompleted(false)
+    setResultBlob(null)
+    setError(null)
+    setProgress(0)
+    setProgressMessage('')
+  }
+
+  const handleDownload = () => {
+    if (resultBlob) {
+      downloadBlob(resultBlob, 'images-to-pdf.pdf')
+    }
+  }
+
+  const handlePreview = () => {
+    if (resultBlob) {
+      const url = URL.createObjectURL(resultBlob)
+      window.open(url, '_blank')
+    }
   }
 
   if (completed) {
     return (
-      <ToolLayout>
-        <CompletedState
-          fileName="images-to-pdf.pdf"
-          fileSize={3.8 * 1024 * 1024}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName="images-to-pdf.pdf"
+        fileSize={resultBlob?.size || 0}
+        onReset={handleReset}
+        onDownload={handleDownload}
+        onPreview={handlePreview}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={65} message="Creating PDF from images..." />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || 'Creating PDF from images...'} />
     )
   }
 
   return (
-    <ToolLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
+      {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
+            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
         {files.length === 0 ? (
           <FileDropzone onDrop={handleDrop} accept="image/*" multiple />
         ) : (
@@ -95,7 +164,15 @@ export default function JPGToPDF() {
                 {files.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-lg"
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDropOnItem(e, index)}
+                    className={`
+                      flex items-center space-x-3 p-3 bg-white border rounded-lg transition-all
+                      ${draggedIndex === index ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
+                      ${draggedIndex !== null && draggedIndex !== index ? 'opacity-50' : ''}
+                    `}
                   >
                     <GripVertical size={18} className="text-gray-400 cursor-grab" />
                     <span className="text-sm text-gray-600">{index + 1}.</span>
@@ -142,6 +219,5 @@ export default function JPGToPDF() {
           </>
         )}
       </div>
-    </ToolLayout>
   )
 }

@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
 import { splitPDF, getPDFPageCount, validatePDFFile, formatFileSize, downloadBlob, downloadBlobs } from '../../lib/pdf/splitPDF'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set up worker with CDN URL matching installed version
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function SplitPDF() {
   const [file, setFile] = useState(null)
@@ -18,10 +22,18 @@ export default function SplitPDF() {
   const [progress, setProgress] = useState(0)
   const [progressMessage, setProgressMessage] = useState('')
   const [error, setError] = useState(null)
+  const [pdf, setPdf] = useState(null)
+  const [loadingPdf, setLoadingPdf] = useState(false)
 
-  const pages = pageCount > 0 
-    ? Array.from({ length: pageCount }, (_, i) => ({ id: i + 1 }))
-    : []
+  const pages = useMemo(() => {
+    if (pageCount > 0) {
+      return Array.from({ length: pageCount }, (_, i) => ({ 
+        id: i + 1,
+        pageNumber: i + 1
+      }))
+    }
+    return []
+  }, [pageCount])
 
   const handleDrop = async (files) => {
     if (files.length > 0) {
@@ -35,13 +47,22 @@ export default function SplitPDF() {
       setError(null)
       setSelectedPages([])
       setCompleted(false)
+      setLoadingPdf(true)
       
       try {
         const count = await getPDFPageCount(files[0])
         setPageCount(count)
+        
+        // Load PDF with pdf.js for rendering
+        const arrayBuffer = await files[0].arrayBuffer()
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+        const pdfDocument = await loadingTask.promise
+        setPdf(pdfDocument)
       } catch (err) {
         setError('Failed to read PDF file')
         setFile(null)
+      } finally {
+        setLoadingPdf(false)
       }
     }
   }
@@ -194,6 +215,8 @@ export default function SplitPDF() {
     setSplitResult(null)
     setError(null)
     setProgress(0)
+    setPdf(null)
+    setLoadingPdf(false)
   }
 
   const handleDownload = () => {
@@ -228,6 +251,12 @@ export default function SplitPDF() {
   if (processing) {
     return (
       <ProcessingState progress={progress} message={progressMessage || 'Splitting PDF pages...'} />
+    )
+  }
+
+  if (loadingPdf) {
+    return (
+      <ProcessingState progress={50} message="Loading PDF..." />
     )
   }
 
@@ -281,6 +310,8 @@ export default function SplitPDF() {
                 pages={pages}
                 selectedPages={selectedPages}
                 onPageSelect={handlePageSelect}
+                pdf={pdf}
+                scale={0.4}
               />
             </div>
           ) : (
