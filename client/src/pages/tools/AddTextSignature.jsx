@@ -1,66 +1,164 @@
-import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
+import { useState, useMemo, useRef } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
 import { Type, PenTool } from 'lucide-react'
+import { addTextSignature } from '../../lib/pdf/addTextSignature'
+import { validatePDFFile, downloadBlob, getPDFPageCount } from '../../lib/pdf/deletePDF'
+import SignaturePad from '../../components/SignaturePad'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function AddTextSignature() {
   const [file, setFile] = useState(null)
   const [tool, setTool] = useState('text')
   const [text, setText] = useState('')
-  const [fontSize, setFontSize] = useState(16)
+  const [fontSize, setFontSize] = useState(24)
+  const [textColor, setTextColor] = useState('Black')
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
+  
+  const [pdfDoc, setPdfDoc] = useState(null)
+  const [pageCount, setPageCount] = useState(0)
+  const [selectedPage, setSelectedPage] = useState(0) // Default to first page
+  const [resultBlob, setResultBlob] = useState(null)
+  
+  const sigCanvas = useRef({})
 
-  const mockPages = Array.from({ length: 4 }, (_, i) => ({ id: i + 1 }))
+  const pages = useMemo(() => {
+    if (pageCount > 0) {
+      return Array.from({ length: pageCount }, (_, i) => ({ 
+        id: i + 1,
+        pageNumber: i + 1
+      }))
+    }
+    return []
+  }, [pageCount])
 
-  const handleDrop = (files) => {
+  const handleDrop = async (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
+      
       setFile(files[0])
+      setError(null)
+      setSelectedPage(0)
+      
+      try {
+        const count = await getPDFPageCount(files[0])
+        setPageCount(count)
+        
+        const arrayBuffer = await files[0].arrayBuffer()
+        const loadedPdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        setPdfDoc(loadedPdf)
+      } catch (err) {
+        setError('Failed to read PDF file')
+        setFile(null)
+      }
     }
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    if (!file) return
+    if (tool === 'text' && !text) return
+    if (tool === 'signature' && sigCanvas.current.isEmpty()) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      let signatureData = null
+      if (tool === 'signature') {
+        const dataURL = sigCanvas.current.toDataURL('image/png')
+        const response = await fetch(dataURL)
+        const blob = await response.blob()
+        signatureData = { type: 'image/png', blob }
+      }
+
+      const textData = { text, fontSize, color: textColor }
+      
+      const blob = await addTextSignature(
+        file, 
+        tool, 
+        textData, 
+        signatureData, 
+        selectedPage,
+        (p, msg) => {
+          setProgress(p)
+          setProgressMessage(msg)
+        }
+      )
+      
+      setResultBlob(blob)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
     setFile(null)
     setTool('text')
     setText('')
-    setFontSize(16)
+    setFontSize(24)
+    setTextColor('Black')
     setCompleted(false)
+    setPdfDoc(null)
+    setPageCount(0)
+    setResultBlob(null)
+    setProgress(0)
+    if (sigCanvas.current && sigCanvas.current.clear) sigCanvas.current.clear()
+  }
+
+  const handleDownload = () => {
+    if (!resultBlob || !file) return
+    const filename = file.name.replace('.pdf', '-annotated.pdf')
+    downloadBlob(resultBlob, filename)
+  }
+
+  const handlePreview = () => {
+    if (resultBlob) {
+      const url = URL.createObjectURL(resultBlob)
+      window.open(url, '_blank')
+    }
   }
 
   if (completed) {
     return (
-      <ToolLayout>
-        <CompletedState
-          fileName="annotated-document.pdf"
-          fileSize={2.3 * 1024 * 1024}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName={file ? file.name.replace('.pdf', '-annotated.pdf') : 'annotated-document.pdf'}
+        fileSize={resultBlob?.size || 0}
+        onReset={handleReset}
+        onDownload={handleDownload}
+        onPreview={handlePreview}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={55} message="Adding annotation..." />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || "Adding annotation..."} />
     )
   }
 
   return (
-    <ToolLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
         {!file ? (
           <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (
@@ -141,19 +239,14 @@ export default function AddTextSignature() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Font family</label>
-                    <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200">
-                      <option>Arial</option>
-                      <option>Times New Roman</option>
-                      <option>Helvetica</option>
-                      <option>Georgia</option>
-                    </select>
-                  </div>
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">Color</label>
-                    <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200">
+                    <select 
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    >
                       <option>Black</option>
                       <option>Blue</option>
                       <option>Red</option>
@@ -170,30 +263,39 @@ export default function AddTextSignature() {
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Draw your signature
                   </label>
-                  <div className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
-                    <p className="text-gray-500 text-sm">Signature drawing area</p>
+                  <div className="w-full h-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white">
+                    <SignaturePad ref={sigCanvas} penColor="black" />
                   </div>
                 </div>
 
                 <div className="flex space-x-4">
-                  <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button 
+                    onClick={() => sigCanvas.current.clear()}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
                     Clear
-                  </button>
-                  <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                    Upload signature image
                   </button>
                 </div>
               </div>
             )}
 
             <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-4">Position on page</h3>
-              <PDFPreview pages={mockPages} />
+              <h3 className="text-sm font-medium text-gray-900 mb-4">Select page to sign/annotate</h3>
+              <select 
+                value={selectedPage}
+                onChange={(e) => setSelectedPage(parseInt(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200 mb-4"
+              >
+                {pages.map(page => (
+                  <option key={page.id} value={page.id - 1}>Page {page.id}</option>
+                ))}
+              </select>
+              <PDFPreview pages={pages.filter(p => p.id - 1 === selectedPage)} pdf={pdfDoc} scale={0.6} />
             </div>
 
             <button
               onClick={handleApply}
-              disabled={tool === 'text' && !text}
+              disabled={tool === 'text' ? !text : false}
               className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               Apply {tool === 'text' ? 'text' : 'signature'}
@@ -201,6 +303,5 @@ export default function AddTextSignature() {
           </>
         )}
       </div>
-    </ToolLayout>
   )
 }

@@ -1,9 +1,13 @@
-import { useState } from 'react'
-import ToolLayout from '../../components/ToolLayout'
+import { useState, useMemo } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
 import FileDropzone from '../../components/FileDropzone'
 import PDFPreview from '../../components/PDFPreview'
 import ProcessingState from '../../components/ProcessingState'
 import CompletedState from '../../components/CompletedState'
+import { watermarkPDF } from '../../lib/pdf/watermarkPDF'
+import { validatePDFFile, downloadBlob, getPDFPageCount } from '../../lib/pdf/deletePDF' // Reuse validation/download
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs'
 
 export default function WatermarkPDF() {
   const [file, setFile] = useState(null)
@@ -14,8 +18,23 @@ export default function WatermarkPDF() {
   const [rotation, setRotation] = useState(0)
   const [processing, setProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [error, setError] = useState(null)
+  
+  const [pdfDoc, setPdfDoc] = useState(null)
+  const [pageCount, setPageCount] = useState(0)
+  const [resultBlob, setResultBlob] = useState(null)
 
-  const mockPages = Array.from({ length: 4 }, (_, i) => ({ id: i + 1 }))
+  const pages = useMemo(() => {
+    if (pageCount > 0) {
+      return Array.from({ length: pageCount }, (_, i) => ({ 
+        id: i + 1,
+        pageNumber: i + 1
+      }))
+    }
+    return []
+  }, [pageCount])
 
   const positionOptions = [
     { id: 'top-left', name: 'Top Left' },
@@ -27,18 +46,59 @@ export default function WatermarkPDF() {
     { id: 'bottom-right', name: 'Bottom Right' }
   ]
 
-  const handleDrop = (files) => {
+  const handleDrop = async (files) => {
     if (files.length > 0) {
+      const validation = validatePDFFile(files[0])
+      if (!validation.valid) {
+        setError(validation.error)
+        return
+      }
+      
       setFile(files[0])
+      setError(null)
+      
+      try {
+        const count = await getPDFPageCount(files[0])
+        setPageCount(count)
+        
+        const arrayBuffer = await files[0].arrayBuffer()
+        const loadedPdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        setPdfDoc(loadedPdf)
+      } catch (err) {
+        setError('Failed to read PDF file')
+        setFile(null)
+      }
     }
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    if (!file || !watermarkText) return
+    
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      const blob = await watermarkPDF(
+        file, 
+        watermarkText, 
+        fontSize, 
+        opacity, 
+        position, 
+        rotation, 
+        (p, msg) => {
+          setProgress(p)
+          setProgressMessage(msg)
+        }
+      )
+      
+      setResultBlob(blob)
       setCompleted(true)
-    }, 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleReset = () => {
@@ -49,31 +109,50 @@ export default function WatermarkPDF() {
     setPosition('center')
     setRotation(0)
     setCompleted(false)
+    setPdfDoc(null)
+    setPageCount(0)
+    setResultBlob(null)
+    setProgress(0)
+  }
+
+  const handleDownload = () => {
+    if (!resultBlob || !file) return
+    const filename = file.name.replace('.pdf', '-watermarked.pdf')
+    downloadBlob(resultBlob, filename)
+  }
+
+  const handlePreview = () => {
+    if (resultBlob) {
+      const url = URL.createObjectURL(resultBlob)
+      window.open(url, '_blank')
+    }
   }
 
   if (completed) {
     return (
-      <ToolLayout>
-        <CompletedState
-          fileName="watermarked-document.pdf"
-          fileSize={2.5 * 1024 * 1024}
-          onReset={handleReset}
-        />
-      </ToolLayout>
+      <CompletedState
+        fileName={file ? file.name.replace('.pdf', '-watermarked.pdf') : 'watermarked.pdf'}
+        fileSize={resultBlob?.size || 0}
+        onReset={handleReset}
+        onDownload={handleDownload}
+        onPreview={handlePreview}
+      />
     )
   }
 
   if (processing) {
     return (
-      <ToolLayout>
-        <ProcessingState progress={60} message="Adding watermark..." />
-      </ToolLayout>
+      <ProcessingState progress={progress} message={progressMessage || "Adding watermark..."} />
     )
   }
 
   return (
-    <ToolLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
         {!file ? (
           <FileDropzone onDrop={handleDrop} accept=".pdf" />
         ) : (
@@ -170,7 +249,7 @@ export default function WatermarkPDF() {
 
               <div>
                 <h3 className="text-sm font-medium text-gray-900 mb-4">Preview</h3>
-                <PDFPreview pages={mockPages} />
+                <PDFPreview pages={pages} pdf={pdfDoc} scale={0.4} />
               </div>
             </div>
 
@@ -184,6 +263,5 @@ export default function WatermarkPDF() {
           </>
         )}
       </div>
-    </ToolLayout>
   )
 }
