@@ -20,8 +20,8 @@ export default function ToolSidebar() {
       </button>
 
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-30
-        w-64 bg-white border-r border-gray-200
+        fixed lg:sticky inset-y-0 lg:top-0 left-0 z-30
+        w-64 lg:h-screen bg-white border-r border-gray-200
         transform transition-transform duration-200 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
