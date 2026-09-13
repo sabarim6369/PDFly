@@ -143,6 +143,13 @@ export default function RotatePDF() {
     downloadBlob(rotatedPdf, filename)
   }
 
+  const handlePreview = () => {
+    if (rotatedPdf) {
+      const url = URL.createObjectURL(rotatedPdf)
+      window.open(url, '_blank')
+    }
+  }
+
   if (completed) {
     const fileSize = rotatedPdf ? rotatedPdf.size : 0
     
@@ -152,6 +159,7 @@ export default function RotatePDF() {
         fileSize={fileSize}
         onDownload={handleDownload}
         onReset={handleReset}
+        onPreview={handlePreview}
       />
     )
   }
@@ -222,6 +230,7 @@ export default function RotatePDF() {
                 onPageRotate={handleRotate}
                 pdf={pdf}
                 scale={0.4}
+                rotations={rotations}
               />
             </div>
 

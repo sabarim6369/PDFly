@@ -1,6 +1,6 @@
-import { Download, RefreshCw } from 'lucide-react'
+import { Download, RefreshCw, Eye } from 'lucide-react'
 
-export default function CompletedState({ fileName, fileSize, originalSize, reduction, onReset, onDownload }) {
+export default function CompletedState({ fileName, fileSize, originalSize, reduction, onReset, onDownload, onPreview }) {
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -32,6 +32,15 @@ export default function CompletedState({ fileName, fileSize, originalSize, reduc
       </div>
 
       <div className="flex space-x-4">
+        {onPreview && (
+          <button 
+            onClick={onPreview}
+            className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Eye size={20} />
+            <span>Preview</span>
+          </button>
+        )}
         <button 
           onClick={onDownload}
           className="flex items-center space-x-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"

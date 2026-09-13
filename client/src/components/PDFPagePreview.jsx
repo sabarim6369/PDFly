@@ -67,30 +67,26 @@ export default function PDFPagePreview({ pdf, pageNumber, scale = 0.4 }) {
     }
   }, [pdf, pageNumber, scale])
 
-  if (loading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-xs text-gray-500">Loading…</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <p className="text-xs text-gray-500 text-center px-2">Unable to preview page</p>
-      </div>
-    )
-  }
-
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full object-contain"
-      style={{ display: 'block' }}
-    />
+    <div className="relative w-full h-full">
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-xs text-gray-500">Loading…</p>
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+          <p className="text-xs text-gray-500 text-center px-2">Unable to preview page</p>
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full object-contain"
+        style={{ display: 'block' }}
+      />
+    </div>
   )
 }

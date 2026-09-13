@@ -106,6 +106,13 @@ export default function MergePDF() {
     setResultBlob(null)
   }
 
+  const handlePreview = () => {
+    if (resultBlob) {
+      const url = URL.createObjectURL(resultBlob)
+      window.open(url, '_blank')
+    }
+  }
+
   if (completed) {
     return (
       <CompletedState
@@ -113,6 +120,7 @@ export default function MergePDF() {
         fileSize={resultBlob?.size || 0}
         onReset={handleReset}
         onDownload={handleDownload}
+        onPreview={handlePreview}
       />
     )
   }

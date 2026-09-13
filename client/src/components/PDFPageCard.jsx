@@ -1,7 +1,7 @@
 import { Trash2, RotateCw, GripVertical } from 'lucide-react'
 import PDFPagePreview from './PDFPagePreview'
 
-export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, pdf, scale }) {
+export default function PDFPageCard({ page, index, selected, onSelect, onDelete, onRotate, draggable = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, pdf, scale, rotation = 0 }) {
   return (
     <div
       draggable={draggable}
@@ -26,16 +26,27 @@ export default function PDFPageCard({ page, index, selected, onSelect, onDelete,
         onClick={() => onSelect?.(index)}
       >
         {pdf ? (
-          <>
-            {console.log(`PDFPageCard rendering page ${index} with pdf:`, !!pdf, 'pageNumber:', page.pageNumber)}
+          <div 
+            style={{ 
+              transform: `rotate(${rotation}deg) scale(${Math.abs(rotation % 180) === 90 ? 0.75 : 1})`, 
+              transition: 'transform 0.3s ease' 
+            }} 
+            className="w-full h-full flex items-center justify-center"
+          >
             <PDFPagePreview
               pdf={pdf}
               pageNumber={page.pageNumber}
               scale={scale}
             />
-          </>
+          </div>
         ) : (
-          <div className="text-center">
+          <div 
+            className="text-center" 
+            style={{ 
+              transform: `rotate(${rotation}deg) scale(${Math.abs(rotation % 180) === 90 ? 0.75 : 1})`, 
+              transition: 'transform 0.3s ease' 
+            }}
+          >
             <div className="w-16 h-20 bg-gray-200 rounded mx-auto mb-2" />
             <p className="text-xs text-gray-500">Page {index + 1}</p>
           </div>
@@ -51,7 +62,7 @@ export default function PDFPageCard({ page, index, selected, onSelect, onDelete,
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onRotate(index)
+              onRotate(index, 'right')
             }}
             className="p-1.5 bg-white rounded shadow-sm hover:bg-gray-50 transition-colors"
             aria-label="Rotate page"

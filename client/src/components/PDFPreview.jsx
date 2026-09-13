@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import PDFPageCard from './PDFPageCard'
 
-export default function PDFPreview({ pages, onPageSelect, selectedPages, onPageDelete, onPageRotate, draggable = false, onPageReorder, pdf, scale = 0.4 }) {
+export default function PDFPreview({ pages, onPageSelect, selectedPages, onPageDelete, onPageRotate, draggable = false, onPageReorder, pdf, scale = 0.4, rotations = {} }) {
   const [draggedIndex, setDraggedIndex] = useState(null)
 
   const handleDragStart = (index) => {
@@ -49,6 +49,7 @@ export default function PDFPreview({ pages, onPageSelect, selectedPages, onPageD
           isDragging={draggedIndex === index}
           pdf={pdf}
           scale={scale}
+          rotation={rotations[index] || 0}
         />
       ))}
     </div>
