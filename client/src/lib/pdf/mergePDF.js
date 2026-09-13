@@ -1,36 +1,22 @@
-import { PDFDocument } from 'pdf-lib'
+import { runPDFWorker } from '../../webworker/workerClient'
 
 export async function mergePDFs(files, onProgress) {
   try {
-    const mergedPdf = await PDFDocument.create()
-    const totalFiles = files.length
+    const buffers = []
     
-    for (let i = 0; i < totalFiles; i++) {
-      const file = files[i]
-      
-      try {
-        const arrayBuffer = await file.arrayBuffer()
-        const pdf = await PDFDocument.load(arrayBuffer)
-        
-        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices())
-        pages.forEach((page) => {
-          mergedPdf.addPage(page)
-        })
-        
-        if (onProgress) {
-          const progress = Math.round(((i + 1) / totalFiles) * 100)
-          onProgress(progress, `Processing ${file.name}...`)
-        }
-      } catch (error) {
-        throw new Error(`Failed to process ${file.name}: ${error.message}`)
-      }
+    // Read all files into ArrayBuffers
+    for (let i = 0; i < files.length; i++) {
+      const buffer = await files[i].arrayBuffer()
+      buffers.push(buffer)
     }
     
-    const pdfBytes = await mergedPdf.save()
+    const blob = await runPDFWorker(
+      'MERGE', 
+      { buffers }, 
+      onProgress
+    )
     
-    return new Blob([pdfBytes], {
-      type: 'application/pdf'
-    })
+    return blob
   } catch (error) {
     throw new Error(`Failed to merge PDFs: ${error.message}`)
   }
