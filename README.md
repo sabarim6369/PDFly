@@ -23,6 +23,11 @@ PDFly features a secure, real-time file-sharing mechanism built with Socket.io.
 - **Real-Time Transfers:** Participants receive shared files instantly via chunked socket streaming.
 - **Mobile Friendly:** Generate QR codes or shareable links to let others join instantly.
 
+### 📱 Progressive Web App (PWA)
+PDFly is built as a Progressive Web App, offering a native-like experience.
+- **Installable:** Add PDFly directly to your desktop or mobile home screen.
+- **Fast & Reliable:** Service workers ensure lightning-fast load times and allow you to use core PDF tools even when offline.
+
 ## 🚀 Tech Stack
 
 **Frontend:**
@@ -31,6 +36,7 @@ PDFly features a secure, real-time file-sharing mechanism built with Socket.io.
 - lucide-react (Icons)
 - PDF manipulation libraries (`pdf-lib`, `pdfjs-dist`)
 - Socket.io-client
+- vite-plugin-pwa (Progressive Web App support)
 
 **Backend:**
 - Node.js & Express
