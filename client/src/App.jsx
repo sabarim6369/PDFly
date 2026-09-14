@@ -15,6 +15,9 @@ import DeletePages from './pages/tools/DeletePages'
 import ReorderPages from './pages/tools/ReorderPages'
 import WatermarkPDF from './pages/tools/WatermarkPDF'
 import AddTextSignature from './pages/tools/AddTextSignature'
+import RoomsList from './pages/rooms/RoomsList'
+import CreateRoom from './pages/rooms/CreateRoom'
+import RoomView from './pages/rooms/RoomView'
 
 function ToolWrapper({ children }) {
   return (
@@ -53,6 +56,24 @@ function App() {
               <Privacy />
               <Footer />
             </>
+          } />
+          
+          <Route path="/rooms" element={
+            <ToolWrapper>
+              <RoomsList />
+            </ToolWrapper>
+          } />
+          
+          <Route path="/rooms/create" element={
+            <ToolWrapper>
+              <CreateRoom />
+            </ToolWrapper>
+          } />
+          
+          <Route path="/rooms/:code" element={
+            <ToolWrapper>
+              <RoomView />
+            </ToolWrapper>
           } />
           
           <Route path="/tools/merge-pdf" element={

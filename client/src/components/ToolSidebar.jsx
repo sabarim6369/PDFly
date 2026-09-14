@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Menu, X, Lock, Home, ExternalLink } from 'lucide-react'
+import { Menu, X, Lock, Home, ExternalLink, MonitorUp } from 'lucide-react'
 import { tools } from '../data/tools'
 
 export default function ToolSidebar() {
@@ -55,6 +55,28 @@ export default function ToolSidebar() {
                     <span>{tool.name}</span>
                   </Link>
                 ))}
+              </nav>
+            </div>
+
+            <div className="mb-6">
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 px-3">
+                Rooms
+              </h2>
+              <nav className="space-y-1">
+                <Link
+                  to="/rooms"
+                  className={`
+                    flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors
+                    ${location.pathname.startsWith('/rooms')
+                      ? 'bg-gray-100 text-gray-900 font-medium'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }
+                  `}
+                  onClick={() => setIsOpen(false)}
+                >
+                  <MonitorUp size={18} />
+                  <span>Available Rooms</span>
+                </Link>
               </nav>
             </div>
 
