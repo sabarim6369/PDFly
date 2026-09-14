@@ -15,10 +15,9 @@ export default function RoomView() {
   const [showShareModal, setShowShareModal] = useState(false);
   
   // File Sharing State
-  const [sharingProgress, setSharingProgress] = useState(0);
-  const [sharedFile, setSharedFile] = useState(null);
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [currentTransfer, setCurrentTransfer] = useState(null);
   const [isReceiving, setIsReceiving] = useState(false);
-  const [receiveProgress, setReceiveProgress] = useState(0);
   
   const socketRef = useRef(null);
   const chunksRef = useRef([]);
@@ -59,8 +58,7 @@ export default function RoomView() {
 
     socket.on('file_share_start', (data) => {
       setIsReceiving(true);
-      setReceiveProgress(0);
-      setSharedFile(data);
+      setCurrentTransfer({ ...data, progress: 0 });
       fileInfoRef.current = data;
       chunksRef.current = [];
     });
@@ -68,7 +66,8 @@ export default function RoomView() {
     socket.on('file_chunk', (data) => {
       chunksRef.current.push(data.chunk);
       if (fileInfoRef.current) {
-        setReceiveProgress(Math.round((chunksRef.current.length / fileInfoRef.current.totalChunks) * 100));
+        const progress = Math.round((chunksRef.current.length / fileInfoRef.current.totalChunks) * 100);
+        setCurrentTransfer(prev => prev ? { ...prev, progress } : null);
       }
     });
 
@@ -76,9 +75,9 @@ export default function RoomView() {
       if (chunksRef.current.length > 0) {
         const blob = new Blob(chunksRef.current, { type: fileInfoRef.current?.fileType || 'application/pdf' });
         const url = URL.createObjectURL(blob);
-        setSharedFile(prev => ({ ...prev, downloadUrl: url }));
+        setSharedFiles(prev => [...prev, { ...fileInfoRef.current, downloadUrl: url }]);
         setIsReceiving(false);
-        setReceiveProgress(100);
+        setCurrentTransfer(null);
       }
     });
 
@@ -91,8 +90,7 @@ export default function RoomView() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setSharedFile({ fileName: file.name, fileSize: file.size, fileType: file.type });
-    setSharingProgress(0);
+    setCurrentTransfer({ fileName: file.name, fileSize: file.size, progress: 0 });
     
     const CHUNK_SIZE = 64 * 1024; // 64KB chunks
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -122,12 +120,16 @@ export default function RoomView() {
         offset += CHUNK_SIZE;
         index++;
         
-        setSharingProgress(Math.round((index / totalChunks) * 100));
+        const progress = Math.round((index / totalChunks) * 100);
+        setCurrentTransfer(prev => prev ? { ...prev, progress } : null);
         
         if (offset < file.size) {
           readChunk();
         } else {
           socketRef.current.emit('file_share_complete', code);
+          const url = URL.createObjectURL(file);
+          setSharedFiles(prev => [...prev, { fileName: file.name, fileSize: file.size, fileType: file.type, downloadUrl: url }]);
+          setCurrentTransfer(null);
         }
       };
       reader.readAsArrayBuffer(chunk);
@@ -187,107 +189,110 @@ export default function RoomView() {
         <div className="lg:col-span-2 space-y-8">
 
           {isHost ? (
-            <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm flex flex-col items-center justify-center text-center border-dashed border-2 bg-indigo-50/30 min-h-[300px]">
-              {sharedFile ? (
-                <div className="w-full max-w-md">
-                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 size={32} />
+            <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm flex flex-col min-h-[300px]">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <UploadCloud className="text-indigo-600" />
+                  Host File Sharing Area
+                </h3>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                  disabled={currentTransfer !== null}
+                >
+                  Share New PDF
+                </button>
+              </div>
+              
+              <input 
+                type="file" 
+                accept="application/pdf" 
+                className="hidden" 
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+              />
+              
+              {currentTransfer && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-6">
+                  <div className="flex justify-between text-sm font-medium text-indigo-900 mb-2">
+                    <span>Sending: {currentTransfer.fileName}</span>
+                    <span>{currentTransfer.progress}%</span>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Sharing File</h3>
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center gap-4 text-left mb-6">
-                    <FileText size={32} className="text-indigo-600 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{sharedFile.fileName}</p>
-                      <p className="text-xs text-gray-500">{(sharedFile.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                    </div>
+                  <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
+                    <div className="bg-indigo-600 h-2 rounded-full transition-all duration-200" style={{ width: `${currentTransfer.progress}%` }}></div>
                   </div>
-                  
-                  {sharingProgress < 100 ? (
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2 overflow-hidden">
-                      <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${sharingProgress}%` }}></div>
-                    </div>
-                  ) : (
-                    <p className="text-green-600 font-medium mb-4">File successfully shared to room!</p>
-                  )}
-                  <p className="text-sm text-gray-500">{sharingProgress}% completed</p>
-                  
-                  <button 
-                    onClick={() => {
-                      setSharedFile(null);
-                      setSharingProgress(0);
-                    }}
-                    className="mt-6 px-6 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    Share Another File
-                  </button>
                 </div>
-              ) : (
-                <>
-                  <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <UploadCloud size={32} />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Host File Sharing Area</h3>
-                  <p className="text-gray-600 text-sm mt-2 max-w-md mx-auto mb-6">
-                    Select a PDF file here. Files shared here will be instantly available to all connected participants.
-                  </p>
-                  <input 
-                    type="file" 
-                    accept="application/pdf" 
-                    className="hidden" 
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                  />
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                  >
-                    Select PDF to Share
-                  </button>
-                </>
               )}
+              
+              <div className="space-y-3">
+                {sharedFiles.length === 0 && !currentTransfer ? (
+                  <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                    <MonitorUp size={32} className="text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No files shared yet. Click "Share New PDF" to start.</p>
+                  </div>
+                ) : (
+                  sharedFiles.map((f, i) => (
+                    <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:border-indigo-200 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <FileText size={24} className="text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm line-clamp-1">{f.fileName}</p>
+                          <p className="text-xs text-gray-500">{(f.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                      </div>
+                      <CheckCircle2 size={20} className="text-green-500" />
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm flex flex-col items-center justify-center text-center min-h-[300px] border-dashed border-2 bg-gray-50/50">
-              {sharedFile ? (
-                <div className="w-full max-w-md">
-                  <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FileText size={32} />
+            <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm flex flex-col min-h-[300px]">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-6">
+                <Download className="text-indigo-600" />
+                Shared Files
+              </h3>
+              
+              {currentTransfer && isReceiving && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-6 animate-pulse">
+                  <div className="flex justify-between text-sm font-medium text-indigo-900 mb-2">
+                    <span>Receiving: {currentTransfer.fileName}</span>
+                    <span>{currentTransfer.progress}%</span>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Incoming File</h3>
-                  
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center gap-4 text-left mb-6">
-                    <FileText size={32} className="text-indigo-600 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{sharedFile.fileName}</p>
-                      <p className="text-xs text-gray-500">{(sharedFile.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                    </div>
+                  <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
+                    <div className="bg-indigo-600 h-2 rounded-full transition-all duration-200" style={{ width: `${currentTransfer.progress}%` }}></div>
                   </div>
-
-                  {isReceiving ? (
-                    <>
-                      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2 overflow-hidden">
-                        <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${receiveProgress}%` }}></div>
-                      </div>
-                      <p className="text-sm text-gray-500">Receiving... {receiveProgress}%</p>
-                    </>
-                  ) : (
-                    <a 
-                      href={sharedFile.downloadUrl} 
-                      download={sharedFile.fileName}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                    >
-                      <Download size={20} />
-                      Download File
-                    </a>
-                  )}
                 </div>
-              ) : (
-                <>
-                  <MonitorUp size={48} className="text-gray-400 mb-4 animate-pulse" />
-                  <h3 className="text-lg font-medium text-gray-900">Waiting for Host...</h3>
-                  <p className="text-gray-500 text-sm mt-1">Files shared by the host will appear here automatically.</p>
-                </>
               )}
+              
+              <div className="space-y-3">
+                {sharedFiles.length === 0 && !currentTransfer ? (
+                  <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                    <MonitorUp size={32} className="text-gray-400 mx-auto mb-3 animate-pulse" />
+                    <p className="text-gray-500 text-sm">Waiting for the host to share files...</p>
+                  </div>
+                ) : (
+                  sharedFiles.map((f, i) => (
+                    <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:border-indigo-200 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <FileText size={24} className="text-indigo-600" />
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm line-clamp-1">{f.fileName}</p>
+                          <p className="text-xs text-gray-500">{(f.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                      </div>
+                      <a 
+                        href={f.downloadUrl}
+                        download={f.fileName}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Download File"
+                      >
+                        <Download size={20} />
+                      </a>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
