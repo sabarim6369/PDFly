@@ -37,6 +37,27 @@ io.on('connection', (socket) => {
     socket.to(roomCode).emit('update_participants');
   });
   
+  // File sharing events
+  socket.on('file_share_start', (data) => {
+    socket.to(data.roomCode).emit('file_share_start', {
+      fileName: data.fileName,
+      fileSize: data.fileSize,
+      fileType: data.fileType,
+      totalChunks: data.totalChunks
+    });
+  });
+
+  socket.on('file_chunk', (data) => {
+    socket.to(data.roomCode).emit('file_chunk', {
+      chunk: data.chunk,
+      index: data.index
+    });
+  });
+
+  socket.on('file_share_complete', (roomCode) => {
+    socket.to(roomCode).emit('file_share_complete');
+  });
+  
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
